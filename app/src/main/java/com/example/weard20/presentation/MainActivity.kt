@@ -88,7 +88,7 @@ fun WearD20App() {
             )
 
             val resultColor = when (rollResult) {
-                currentMax -> Color.Yellow
+                currentMax -> Color.Green
                 1 -> Color.Red
                 else -> Color.White
             }
