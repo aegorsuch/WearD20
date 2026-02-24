@@ -7,6 +7,7 @@ import android.os.Vibrator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
@@ -53,6 +54,7 @@ fun WearD20App() {
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color.Black)
             .combinedClickable(
                 onClick = {
                     rollResult = (1..currentMax).random()
