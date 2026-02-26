@@ -1,6 +1,10 @@
 package com.example.weard20.presentation
 
 import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -19,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
+import kotlin.math.sqrt
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,13 +47,70 @@ fun WearD20App() {
 
     val currentMax = diceTypes[dieIndex]
 
-    // MODERN VIBRATOR LOGIC: Fixes the deprecation error
-    val vibrator = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-        val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as android.os.VibratorManager
-        vibratorManager.defaultVibrator
-    } else {
-        @Suppress("DEPRECATION")
-        context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+    // MODERN VIBRATOR LOGIC
+    val vibrator = remember {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as android.os.VibratorManager
+            vibratorManager.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
+    }
+
+    // SHAKE DETECTION LOGIC
+    val sensorManager = remember { context.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
+    val accelerometer = remember { sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) }
+
+    fun performRoll() {
+        rollResult = (1..currentMax).random()
+        when (rollResult) {
+            currentMax -> {
+                vibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 50, 50, 50), intArrayOf(0, 255, 0, 255), -1))
+            }
+            1 -> {
+                vibrator.vibrate(VibrationEffect.createOneShot(400, 150))
+            }
+            else -> {
+                vibrator.vibrate(VibrationEffect.createOneShot(30, 100))
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        val listener = object : SensorEventListener {
+            private var lastUpdate: Long = 0
+            private var lastX = 0f
+            private var lastY = 0f
+            private var lastZ = 0f
+            private val SHAKE_THRESHOLD = 800 // Sensitivity (lower is more sensitive)
+
+            override fun onSensorChanged(event: SensorEvent) {
+                val curTime = System.currentTimeMillis()
+                if ((curTime - lastUpdate) > 100) {
+                    val diffTime = curTime - lastUpdate
+                    lastUpdate = curTime
+
+                    val x = event.values[0]
+                    val y = event.values[1]
+                    val z = event.values[2]
+
+                    val speed = sqrt(((x - lastX) * (x - lastX) + (y - lastY) * (y - lastY) + (z - lastZ) * (z - lastZ)).toDouble()) / diffTime * 10000
+
+                    if (speed > SHAKE_THRESHOLD) {
+                        performRoll()
+                    }
+
+                    lastX = x
+                    lastY = y
+                    lastZ = z
+                }
+            }
+            override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {}
+        }
+
+        sensorManager.registerListener(listener, accelerometer, SensorManager.SENSOR_DELAY_GAME)
+        onDispose { sensorManager.unregisterListener(listener) }
     }
 
     Box(
@@ -56,24 +118,7 @@ fun WearD20App() {
             .fillMaxSize()
             .background(Color.Black)
             .combinedClickable(
-                onClick = {
-                    rollResult = (1..currentMax).random()
-
-                    when (rollResult) {
-                        currentMax -> {
-                            // Crit Success: Double Pulse
-                            vibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 50, 50, 50), intArrayOf(0, 255, 0, 255), -1))
-                        }
-                        1 -> {
-                            // Crit Fail: Long Buzz
-                            vibrator.vibrate(VibrationEffect.createOneShot(400, 150))
-                        }
-                        else -> {
-                            // Normal: Short tap
-                            vibrator.vibrate(VibrationEffect.createOneShot(30, 100))
-                        }
-                    }
-                },
+                onClick = { performRoll() },
                 onLongClick = {
                     dieIndex = (dieIndex + 1) % diceTypes.size
                     rollResult = diceTypes[dieIndex]
@@ -103,7 +148,7 @@ fun WearD20App() {
             )
 
             Text(
-                text = "Hold to change",
+                text = "Shake to roll",
                 style = MaterialTheme.typography.caption2,
                 color = Color.LightGray
             )
