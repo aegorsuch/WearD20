@@ -98,6 +98,9 @@ fun WearD20App() {
                 rollResult = if (modifierMode == RollModifier.ADVANTAGE) maxOf(r1, r2) else minOf(r1, r2)
             }
 
+            // Reset modifier after roll
+            modifierMode = RollModifier.NORMAL
+
             when (rollResult) {
                 currentMax -> vibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 50, 50, 50), intArrayOf(0, 255, 0, 255), -1))
                 1 -> vibrator.vibrate(VibrationEffect.createOneShot(400, 150))
@@ -108,19 +111,11 @@ fun WearD20App() {
     }
 
     val draggableState = rememberDraggableState { delta ->
-        if (delta > 40) {
-            modifierMode = when (modifierMode) {
-                RollModifier.NORMAL -> RollModifier.DISADVANTAGE
-                RollModifier.DISADVANTAGE -> RollModifier.ADVANTAGE
-                RollModifier.ADVANTAGE -> RollModifier.NORMAL
-            }
+        if (delta > 40) { // Swipe Right -> Advantage (Now on Right)
+            modifierMode = if (modifierMode == RollModifier.ADVANTAGE) RollModifier.NORMAL else RollModifier.ADVANTAGE
             vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
-        } else if (delta < -40) {
-            modifierMode = when (modifierMode) {
-                RollModifier.NORMAL -> RollModifier.ADVANTAGE
-                RollModifier.ADVANTAGE -> RollModifier.DISADVANTAGE
-                RollModifier.DISADVANTAGE -> RollModifier.NORMAL
-            }
+        } else if (delta < -40) { // Swipe Left -> Disadvantage (Now on Left)
+            modifierMode = if (modifierMode == RollModifier.DISADVANTAGE) RollModifier.NORMAL else RollModifier.DISADVANTAGE
             vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
         }
     }
@@ -195,13 +190,22 @@ fun WearD20App() {
                     Spacer(modifier = Modifier.height(2.dp))
 
                     // ADV/DIS Prominent Label
-                    if (modifierMode != RollModifier.NORMAL) {
-                        Text(
-                            text = if (modifierMode == RollModifier.ADVANTAGE) "ADVANTAGE" else "DISADVANTAGE",
-                            style = MaterialTheme.typography.button,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = if (modifierMode == RollModifier.ADVANTAGE) Color.Green else Color.Red
-                        )
+                    if (modifierMode != RollModifier.NORMAL || isRolling) {
+                         // Simplified logic for state:
+                         val displayMode = if (modifierMode == RollModifier.ADVANTAGE) "ADVANTAGE" 
+                                           else if (modifierMode == RollModifier.DISADVANTAGE) "DISADVANTAGE" 
+                                           else ""
+
+                        if (displayMode.isNotEmpty()) {
+                            Text(
+                                text = displayMode,
+                                style = MaterialTheme.typography.button,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (displayMode == "ADVANTAGE") Color.Green else Color.Red
+                            )
+                        } else {
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
                     } else {
                         Spacer(modifier = Modifier.height(16.dp))
                     }
@@ -240,29 +244,13 @@ fun WearD20App() {
             }
         }
 
-        // Side Buttons for Advantage/Disadvantage
+        // Side Buttons for Advantage/Disadvantage (FLIPPED)
         Row(
             modifier = Modifier.fillMaxSize(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Advantage Area (Left side of screen)
-            Column(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(40.dp)
-                    .clickable {
-                        modifierMode = if (modifierMode == RollModifier.ADVANTAGE) RollModifier.NORMAL else RollModifier.ADVANTAGE
-                        vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
-                    },
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text("<", color = Color.Gray.copy(alpha = hintAlpha), fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text("+", color = Color.Green.copy(alpha = hintAlpha), fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            }
-
-            // Disadvantage Area (Right side of screen)
+            // DISADVANTAGE Area (Left side of screen)
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
@@ -274,8 +262,24 @@ fun WearD20App() {
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(">", color = Color.Gray.copy(alpha = hintAlpha), fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text("<", color = Color.Gray.copy(alpha = hintAlpha), fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Text("-", color = Color.Red.copy(alpha = hintAlpha), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+
+            // ADVANTAGE Area (Right side of screen)
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(40.dp)
+                    .clickable {
+                        modifierMode = if (modifierMode == RollModifier.ADVANTAGE) RollModifier.NORMAL else RollModifier.ADVANTAGE
+                        vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+                    },
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(">", color = Color.Gray.copy(alpha = hintAlpha), fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text("+", color = Color.Green.copy(alpha = hintAlpha), fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
