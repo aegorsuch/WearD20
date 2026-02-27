@@ -61,7 +61,8 @@ fun WearD20App() {
     var modifierMode by remember { mutableStateOf(RollModifier.NORMAL) }
     var isRolling by remember { mutableStateOf(false) }
 
-    val currentMax = diceTypes[dieIndex]
+    // Use a derived state for currentMax to ensure it always matches dieIndex
+    val currentMax by remember { derivedStateOf { diceTypes[dieIndex] } }
 
     val vibrator = remember {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
@@ -82,18 +83,23 @@ fun WearD20App() {
         scope.launch {
             isRolling = true
             val startTime = System.currentTimeMillis()
+            
+            // Rolling Animation: Use the actual currentMax
             while (System.currentTimeMillis() - startTime < 600) {
                 rollResult = (1..currentMax).random()
                 vibrator.vibrate(VibrationEffect.createOneShot(15, 60))
                 delay(50)
             }
 
+            // Capture the specific currentMax for the final roll to be extra safe
+            val targetMax = currentMax
+
             if (modifierMode == RollModifier.NORMAL) {
-                rollResult = (1..currentMax).random()
+                rollResult = (1..targetMax).random()
                 subRolls = null
             } else {
-                val r1 = (1..currentMax).random()
-                val r2 = (1..currentMax).random()
+                val r1 = (1..targetMax).random()
+                val r2 = (1..targetMax).random()
                 subRolls = r1 to r2
                 rollResult = if (modifierMode == RollModifier.ADVANTAGE) maxOf(r1, r2) else minOf(r1, r2)
             }
@@ -102,7 +108,7 @@ fun WearD20App() {
             modifierMode = RollModifier.NORMAL
 
             when (rollResult) {
-                currentMax -> vibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 50, 50, 50), intArrayOf(0, 255, 0, 255), -1))
+                targetMax -> vibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 50, 50, 50), intArrayOf(0, 255, 0, 255), -1))
                 1 -> vibrator.vibrate(VibrationEffect.createOneShot(400, 150))
                 else -> vibrator.vibrate(VibrationEffect.createOneShot(30, 100))
             }
@@ -168,10 +174,12 @@ fun WearD20App() {
                 .combinedClickable(
                     onClick = { performRoll() },
                     onLongClick = {
-                        dieIndex = (dieIndex + 1) % diceTypes.size
-                        rollResult = diceTypes[dieIndex]
-                        subRolls = null
-                        vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK))
+                        if (!isRolling) {
+                            dieIndex = (dieIndex + 1) % diceTypes.size
+                            rollResult = diceTypes[dieIndex]
+                            subRolls = null
+                            vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK))
+                        }
                     }
                 ),
             contentAlignment = Alignment.Center
@@ -191,7 +199,6 @@ fun WearD20App() {
 
                     // ADV/DIS Prominent Label
                     if (modifierMode != RollModifier.NORMAL || isRolling) {
-                         // Simplified logic for state:
                          val displayMode = if (modifierMode == RollModifier.ADVANTAGE) "ADVANTAGE" 
                                            else if (modifierMode == RollModifier.DISADVANTAGE) "DISADVANTAGE" 
                                            else ""
@@ -256,8 +263,10 @@ fun WearD20App() {
                     .fillMaxHeight()
                     .width(40.dp)
                     .clickable {
-                        modifierMode = if (modifierMode == RollModifier.DISADVANTAGE) RollModifier.NORMAL else RollModifier.DISADVANTAGE
-                        vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+                        if (!isRolling) {
+                            modifierMode = if (modifierMode == RollModifier.DISADVANTAGE) RollModifier.NORMAL else RollModifier.DISADVANTAGE
+                            vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+                        }
                     },
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -272,8 +281,10 @@ fun WearD20App() {
                     .fillMaxHeight()
                     .width(40.dp)
                     .clickable {
-                        modifierMode = if (modifierMode == RollModifier.ADVANTAGE) RollModifier.NORMAL else RollModifier.ADVANTAGE
-                        vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+                        if (!isRolling) {
+                            modifierMode = if (modifierMode == RollModifier.ADVANTAGE) RollModifier.NORMAL else RollModifier.ADVANTAGE
+                            vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+                        }
                     },
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
